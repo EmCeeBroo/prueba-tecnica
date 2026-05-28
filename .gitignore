@@ -1,11 +1,18 @@
-venv/
+# Python
 __pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
 .env
-*.db
-*.pyc
-.idea/
+.venv
+
+# IDE
 .vscode/
-.DS_Store
+.idea/
+
+# Proyecto
 uploads/
 *.log
 .pytest_cache/

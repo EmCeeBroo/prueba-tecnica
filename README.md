@@ -38,7 +38,7 @@ pip install -r requirements.txt
 # Configurar .env con tu contraseña de PostgreSQL
 
 # En una terminal, ejecutar el worker
-python app/workers/processor.py
+python -m app.workers.processor
 
 # En otra terminal, ejecutar la API
 uvicorn app.main:app --reload

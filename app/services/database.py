@@ -48,6 +48,17 @@ class DatabaseService:
                     error_message TEXT
                 )
             """)
+
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS job_queue (
+                    id SERIAL PRIMARY KEY,
+                    job_id UUID NOT NULL,
+                    status VARCHAR(20) NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP
+                )
+            """)
+            
             print("✅ Tablas creadas/verificadas")
     
     async def create_job(self, job_id: UUID):
