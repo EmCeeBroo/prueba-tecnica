@@ -1,0 +1,70 @@
+{
+  "name": "Daily Sales Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"hours": 24}]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Run daily at midnight",
+      "type": "n8n-nodes-base.cron",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/jobs/completed",
+        "method": "GET"
+      },
+      "id": "get-jobs",
+      "name": "Get completed jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "connection": {
+          "postgresql": {
+            "database": "logyca_db",
+            "host": "localhost",
+            "password": "secret",
+            "port": 5432,
+            "user": "postgres"
+          }
+        },
+        "query": "SELECT date, SUM(total) as total_sales FROM sales GROUP BY date ORDER BY date",
+        "options": {}
+      },
+      "id": "query-sales",
+      "name": "Query daily totals",
+      "type": "n8n-nodes-base.postgres",
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "connection": {
+          "postgresql": {
+            "database": "logyca_db",
+            "host": "localhost",
+            "password": "secret",
+            "port": 5432,
+            "user": "postgres"
+          }
+        },
+        "table": "sales_daily_summary",
+        "columns": "date, total_sales",
+        "operation": "insert"
+      },
+      "id": "insert-summary",
+      "name": "Insert daily summary",
+      "type": "n8n-nodes-base.postgres",
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "cron-trigger": { "main": [[{"node": "get-jobs", "index": 0}]] },
+    "get-jobs": { "main": [[{"node": "query-sales", "index": 0}]] },
+    "query-sales": { "main": [[{"node": "insert-summary", "index": 0}]] }
+  }
+}
