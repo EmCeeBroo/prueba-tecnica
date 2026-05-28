@@ -1,18 +1,82 @@
-# Python
+# Bytecode y caché de Python
 __pycache__/
 *.py[cod]
 *.so
-.Python
+.python
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Entornos virtuales
 venv/
 env/
-.env
-.venv
+.venv/
+ENV/
+env.bak/
+venv.bak/
 
-# IDE
+# Variables de entorno y secretos (NUNCA subir)
+.env
+.env.local
+.env.production
+.env.*.local
+*.env
+
+# IDE y editores
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# Proyecto
+# Archivos de proyecto
 uploads/
+logs/
 *.log
-.pytest_cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker (datos persistentes locales, no los Dockerfiles)
+postgres_data/
+azurite_data/
+*.pid
+
+# n8n (datos locales, no el workflow exportado)
+n8n_data/
+.n8n/
+
+# Archivos de cobertura de pruebas
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Archivos de paquetes
+*.tar.gz
+*.whl
+dist/
+build/
+*.egg-info/
+
+# Archivos de sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+*.backup
