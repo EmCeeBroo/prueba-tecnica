@@ -1,70 +1,67 @@
 {
-  "name": "Daily Sales Summary",
+  "name": "Sales Daily Summary",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [{"hours": 24}]
-        }
+        "rule": { "interval": [{ "hours": 24 }] }
       },
       "id": "cron-trigger",
-      "name": "Run daily at midnight",
+      "name": "Ejecutar diariamente",
       "type": "n8n-nodes-base.cron",
       "position": [250, 300]
     },
     {
       "parameters": {
-        "url": "http://localhost:8000/jobs/completed",
+        "url": "http://api:8000/jobs/completed",
         "method": "GET"
       },
-      "id": "get-jobs",
-      "name": "Get completed jobs",
+      "id": "http-request",
+      "name": "Obtener jobs completados",
       "type": "n8n-nodes-base.httpRequest",
       "position": [450, 300]
     },
     {
       "parameters": {
-        "connection": {
-          "postgresql": {
-            "database": "logyca_db",
-            "host": "localhost",
-            "password": "secret",
-            "port": 5432,
-            "user": "postgres"
-          }
-        },
-        "query": "SELECT date, SUM(total) as total_sales FROM sales GROUP BY date ORDER BY date",
-        "options": {}
+        "query": "SELECT date::date, SUM(total) as total_sales FROM sales WHERE date >= CURRENT_DATE - INTERVAL '30 days' GROUP BY date::date ORDER BY date DESC"
       },
-      "id": "query-sales",
-      "name": "Query daily totals",
+      "id": "postgres-query",
+      "name": "Calcular ventas por día",
       "type": "n8n-nodes-base.postgres",
-      "position": [650, 300]
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Postgres"
+        }
+      }
     },
     {
       "parameters": {
-        "connection": {
-          "postgresql": {
-            "database": "logyca_db",
-            "host": "localhost",
-            "password": "secret",
-            "port": 5432,
-            "user": "postgres"
-          }
-        },
         "table": "sales_daily_summary",
         "columns": "date, total_sales",
-        "operation": "insert"
+        "insertMethod": "onConflictMerge"
       },
-      "id": "insert-summary",
-      "name": "Insert daily summary",
+      "id": "postgres-insert",
+      "name": "Guardar resumen",
       "type": "n8n-nodes-base.postgres",
-      "position": [850, 300]
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Postgres"
+        }
+      }
     }
   ],
   "connections": {
-    "cron-trigger": { "main": [[{"node": "get-jobs", "index": 0}]] },
-    "get-jobs": { "main": [[{"node": "query-sales", "index": 0}]] },
-    "query-sales": { "main": [[{"node": "insert-summary", "index": 0}]] }
+    "Ejecutar diariamente": {
+      "main": [[{"node": "Obtener jobs completados", "type": "main", "index": 0}]]
+    },
+    "Obtener jobs completados": {
+      "main": [[{"node": "Calcular ventas por día", "type": "main", "index": 0}]]
+    },
+    "Calcular ventas por día": {
+      "main": [[{"node": "Guardar resumen", "type": "main", "index": 0}]]
+    }
   }
 }

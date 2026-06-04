@@ -5,6 +5,7 @@ from datetime import datetime
 from app.services.storage import storage
 from app.services.queue import queue
 from app.services.database import db
+from app.services.factory import storage, queue, db
 from app.config import settings
 from uuid import UUID
 

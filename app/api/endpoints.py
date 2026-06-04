@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.services.storage import storage
 from app.services.queue import queue
 from app.services.database import db
+from app.services.factory import storage, queue, db
 from app.config import settings
 from uuid import uuid4
 import uuid

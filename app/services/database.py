@@ -58,6 +58,17 @@ class DatabaseService:
                     updated_at TIMESTAMP
                 )
             """)
+
+            # NUEVA: Tabla para resumen diario (usada por n8n)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS sales_daily_summary (
+                    id SERIAL PRIMARY KEY,
+                    date DATE NOT NULL UNIQUE,
+                    total_sales NUMERIC(15,2) NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
             
             print("✅ Tablas creadas/verificadas")
     
