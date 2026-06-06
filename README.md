@@ -1,103 +1,133 @@
-🐳 Docker ready
+🐳 Dockerized Application
 
 # LogyCA Sales Processor
 
-Sistema asíncrono para procesar archivos CSV de ventas de millones de registros.  
-Sube el archivo, lo guarda en **Azure Blob Storage (o local)**, encola el trabajo y un worker lo procesa en segundo plano insertando en **PostgreSQL** por lotes para no saturar la base de datos.  
-Incluye un workflow en **n8n** que calcula ventas por día y guarda un resumen.
+Asynchronous system for processing large CSV sales files containing millions of records.
 
-## 🧱 Arquitectura
+The system uploads the file, stores it in **Azure Blob Storage (or local storage)**, queues the job, and a background worker processes it asynchronously, inserting data into **PostgreSQL** in batches to avoid database overload.
 
-- **FastAPI** – Endpoints:
-  - `POST /upload` – subir CSV, recibe `job_id`
-  - `GET /job/{job_id}` – consultar estado
-  - `GET /jobs/completed` – listar jobs terminados (para n8n)
-  - `GET /health` – health check
-- **Worker** – Bucle infinito que consume mensajes de una cola compartida (PostgreSQL), procesa CSV línea por línea sin cargar todo en memoria e inserta en lotes.
-- **PostgreSQL** – Tablas:
-  - `sales` (ventas, con campo `total` generado automáticamente)
-  - `jobs` (estado del procesamiento)
-  - `job_queue` (cola compartida entre API y worker)
-  - `sales_daily_summary` (resumen diario usado por n8n)
-- **Almacenamiento** – Local (modo `dev`) o Azure Blob Storage (modo `docker` con Azurite).
-- **Cola** – En desarrollo se usa `deque` en memoria, pero para robustez se implementó una cola basada en PostgreSQL con transacciones `FOR UPDATE SKIP LOCKED`.
-- **n8n** – Orquestador externo que ejecuta un workflow diario: consulta jobs completados, calcula ventas por día y guarda en `sales_daily_summary`.
+It also includes an **n8n workflow** that calculates daily sales totals and stores aggregated results.
 
-## 📌 Decisiones técnicas clave
+## 🧱 Architecture
 
-| Decisión | Cómo se implementó |
-|----------|-------------------|
-| No cargar CSV completo en memoria | `csv.reader` sobre `StringIO` y procesar fila a fila |
-| Inserción masiva sin saturar DB | Lotes de 5000 registros + `asyncio.sleep(0.05)` entre lotes |
-| Cola compartida entre API y Worker | Tabla `job_queue` con transacciones `FOR UPDATE SKIP LOCKED` |
-| Modos de ejecución | `dev` (almacenamiento local, cola en memoria) y `docker` (Azure Blob+Queue emulados con Azurite) |
-| Manejo de errores | Si falla una fila se registra y continúa; el estado del job pasa a `FAILED` con mensaje |
-| Pruebas unitarias | `pytest` con mocks para aislar servicios externos |
+* **FastAPI** – Endpoints:
 
-## 🔧 Requisitos previos
+  * `POST /upload` – Upload a CSV file and receive a `job_id`
+  * `GET /job/{job_id}` – Check processing status
+  * `GET /jobs/completed` – List completed jobs (used by n8n)
+  * `GET /health` – Health check endpoint
 
-### Modo local (desarrollo)
-- Python 3.12 (o 3.11) instalado
-- PostgreSQL local corriendo
-- Opcional: `curl` o Postman para probar la API
+* **Worker** – Infinite loop that consumes messages from a shared queue (PostgreSQL), processes CSV files line by line without loading the entire file into memory, and inserts records in batches.
 
-### Modo Docker (producción local)
-- Docker Desktop instalado
-- No necesitas PostgreSQL ni Python local
+* **PostgreSQL** – Tables:
 
-### 🐳 Comandos básicos de Docker (para principiantes)
+  * `sales` (sales records with an automatically generated `total` field)
+  * `jobs` (processing status tracking)
+  * `job_queue` (shared queue between API and worker)
+  * `sales_daily_summary` (daily summary used by n8n)
 
-Si nunca has usado Docker, no te preocupes. Aquí tienes una mini guía de los comandos que usamos en este proyecto:
+* **Storage** – Local storage (`dev` mode) or Azure Blob Storage (`docker` mode using Azurite).
 
-| Comando | ¿Qué hace? |
-|---------|-------------|
-| `docker-compose up -d --build` | Levanta todos los contenedores (PostgreSQL, Azurite, API, Worker, n8n) en segundo plano (`-d`). `--build` reconstruye las imágenes si cambió el código. |
-| `docker ps` | Muestra los contenedores que están corriendo en este momento. |
-| `docker-compose logs -f api` | Muestra los logs (bitácora) de la API en tiempo real (como tener una terminal abierta). Cambia `api` por `worker` o `n8n` para ver otros servicios. |
-| `docker-compose logs -f` | Muestra los logs de **todos** los servicios a la vez. |
-| `docker-compose down` | Detiene y elimina todos los contenedores (pero no borra los datos de las bases de datos). |
-| `docker-compose down -v` | Detiene los contenedores **y borra los volúmenes** (datos de PostgreSQL, n8n, etc.). Úsalo si quieres empezar de cero. |
-| `docker exec -it logyca_postgres psql -U postgres -d logyca_db` | Entra a la terminal interactiva de PostgreSQL dentro del contenedor para ejecutar consultas SQL directamente. |
+* **Queue** – During development, an in-memory `deque` can be used. For production-grade reliability, a PostgreSQL-based queue was implemented using `FOR UPDATE SKIP LOCKED` transactions.
 
-> **Tip:** Si no quieres recordar todos los comandos, puedes usar la extensión **Docker** en VS Code (icono de ballena) para ver y manejar los contenedores con clics.
+* **n8n** – External orchestrator that runs a scheduled workflow: retrieves completed jobs, calculates daily sales totals, and stores results in `sales_daily_summary`.
 
-### Para recordar en 8n8
+## 📌 Key Technical Decisions
 
-> **Nota para principiantes en n8n:**  
-> Una vez que publiques el workflow (botón "Publish"), n8n lo ejecutará automáticamente según la programación que definiste (por ejemplo, cada día a medianoche). No necesitas mantener el navegador abierto ni volver a hacer clic en "Execute workflow". Mientras los contenedores de Docker estén corriendo (`docker-compose up -d`), n8n funcionará solo. Puedes apagar y prender tu PC; al volver a levantar Docker, n8n recordará el workflow y seguirá ejecutándose.
+| Decision                                     | Implementation                                                                                         |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Avoid loading the entire CSV into memory     | `csv.reader` with `StringIO`, processing row by row                                                    |
+| Bulk inserts without overwhelming PostgreSQL | Batches of 5000 records + `asyncio.sleep(0.05)` between batches                                        |
+| Shared queue between API and Worker          | `job_queue` table using `FOR UPDATE SKIP LOCKED` transactions                                          |
+| Execution modes                              | `dev` (local storage, in-memory queue) and `docker` (Azure Blob + Queue emulated with Azurite)         |
+| Error handling                               | Invalid rows are logged and processing continues; job status changes to `FAILED` with an error message |
+| Unit testing                                 | `pytest` with mocks to isolate external services                                                       |
 
-## 📦 Instalación y ejecución
+## 🔧 Prerequisites
 
-### 🔹 Modo local (desarrollo)
+### Local Mode (Development)
+
+* Python 3.12 (or 3.11)
+* Local PostgreSQL instance running
+* Optional: Postman or `curl` for API testing
+
+### Docker Mode (Local Production Environment)
+
+* Docker Desktop installed
+* No need for local PostgreSQL or Python installation
+
+## 🐳 Basic Docker Commands (Beginner Friendly)
+
+If you are new to Docker, don't worry. Here is a quick reference for the commands used in this project:
+
+| Command                                                         | Description                                                                                                                    |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `docker-compose up -d --build`                                  | Starts all containers (PostgreSQL, Azurite, API, Worker, n8n) in detached mode. `--build` rebuilds images if code has changed. |
+| `docker ps`                                                     | Displays all currently running containers.                                                                                     |
+| `docker-compose logs -f api`                                    | Shows real-time logs for the API service. Replace `api` with `worker` or `n8n` to inspect other services.                      |
+| `docker-compose logs -f`                                        | Displays logs from all services simultaneously.                                                                                |
+| `docker-compose down`                                           | Stops and removes all containers while preserving persistent data.                                                             |
+| `docker-compose down -v`                                        | Stops containers and removes associated volumes (PostgreSQL, n8n data, etc.). Use when starting from scratch.                  |
+| `docker exec -it logyca_postgres psql -U postgres -d logyca_db` | Opens an interactive PostgreSQL terminal inside the container.                                                                 |
+
+> **Tip:** If you prefer a graphical interface, install the Docker extension in VS Code (whale icon) to manage containers visually.
+
+## 📌 n8n Reminder
+
+> **Note for n8n beginners:**
+> Once you publish a workflow using the **Publish** button, n8n will execute it automatically according to the schedule you configured (for example, every day at midnight).
+>
+> You do not need to keep your browser open or manually click **Execute Workflow** again.
+>
+> As long as the Docker containers are running (`docker-compose up -d`), n8n will continue executing workflows automatically.
+>
+> You can safely shut down and restart your computer. When Docker starts again, n8n will restore its workflows and continue operating normally.
+
+## 📦 Installation and Execution
+
+### 🔹 Local Mode (Development)
 
 ```bash
-# Clonar repositorio
-git clone <url-del-repo>
+# Clone repository
+git clone <repository-url>
 cd logyca_sales_processor
 
-# Crear entorno virtual
+# Create virtual environment
 python -m venv venv
-source venv/bin/activate   # Linux/Mac
-# o venv\Scripts\activate   Windows
 
-# Instalar dependencias
+# Activate virtual environment
+
+# Linux / macOS
+source venv/bin/activate
+
+# Windows PowerShell
+.\venv\Scripts\Activate.ps1
+
+# Windows CMD
+venv\Scripts\activate.bat
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Configurar archivo .env (ver .env.example)
-# Ejemplo mínimo para modo dev:
-#   mode=dev
-#   POSTGRES_HOST=localhost
-#   POSTGRES_PORT=5432
-#   POSTGRES_DB=logyca_db
-#   POSTGRES_USER=postgres
-#   POSTGRES_PASSWORD=tu_contraseña
-#   UPLOAD_DIR=./uploads
+# Configure .env file (see .env.example)
+# Minimum example for development mode:
+#
+# mode=dev
+# POSTGRES_HOST=localhost
+# POSTGRES_PORT=5432
+# POSTGRES_DB=logyca_db
+# POSTGRES_USER=postgres
+# POSTGRES_PASSWORD=your_password
+# UPLOAD_DIR=./uploads
 
-# Crear la base de datos (si no existe)
-createdb logyca_db   # o desde pgAdmin
+# Create database if it does not exist
+createdb logyca_db
 
-# En una terminal: iniciar el worker
+# Or create it manually using pgAdmin
+
+# Terminal 1: Start worker
 python -m app.workers.processor
 
-# En otra terminal: iniciar la API
+# Terminal 2: Start API
 uvicorn app.main:app --reload
+```
